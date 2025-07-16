@@ -1,5 +1,8 @@
-# Ignore the datasets folder to avoid uploading large files
+# Ignore all files in datasets
 datasets/
+
+# Ignore .zip's
+*.zip
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
