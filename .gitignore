@@ -1,29 +1,37 @@
-# Ignore all files in datasets
-datasets/
-
-# Ignore .zip's
-*.zip
-
-# Byte-compiled / optimized / DLL files
+# Кэш питона
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Virtual environment
+# Виртуальное окружение
 venv/
+env/
+.venv/
 .env/
 
-# Jupyter Notebook checkpoints
-.ipynb_checkpoints/
-
-# Logs and databases
-*.log
-*.sqlite3
-
-# Coverage reports
-htmlcov/
-.coverage
-
-# VSCode settings
+# IDE настройки
 .vscode/
+
+# Data directories
+datasets/raw/
+datasets/processed/
+
+# Сырые загрузки из Kaggle, ZIP-файлы, выгрузки
+*.zip
+*.tar.gz
+*.tar
+*.rar
+
+# Сохранённые модели
+models/*.pkl
+models/*.joblib
+
+# Результаты и визуализации
+results/
+*.png
+*.jpg
+*.svg
+
+# Windows
+Thumbs.db
 
