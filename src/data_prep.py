@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import numpy as np
 
 
 def prep_stat():
@@ -52,3 +53,66 @@ def prep_stat():
         processed_folder, 'stat_data.csv'), index=False
         )
     return stat_df
+
+
+def prep_deg():
+    """
+    Читает CSV из datasets/raw/pwr_anomaly/PWR_Abnormality_Dataset.csv (без parse_dates).
+    Вычисляет два кандидата:
+      - RMS-вибраций по всем колонкам, начинающимся на 'VR'
+      - Давление из колонки 'Pressure'
+    Выбирает тот параметр, у которого более линейный (по R²) рост/дрейф.
+    В качестве времени берёт просто порядковый номер измерения.
+    Сохраняет временной ряд выбранного параметра в datasets/processed/degradation/deg_data.csv
+    и возвращает DataFrame с колонками ['time', <best_param>].
+    """
+    pwr_file = 'datasets/raw/pwr_anomaly/PWR_Abnormality_Dataset.csv'
+    if not os.path.isfile(pwr_file):
+        raise FileNotFoundError(f"Файл не найден: {pwr_file}")
+
+    # Чтение файла
+    df = pd.read_csv(pwr_file)
+    cols = df.columns.tolist()
+
+    # Время — просто индекс строки
+    df['time'] = np.arange(len(df))
+
+    # 1) RMS всех вибрационных каналов (VR*)
+    vib_cols = [c for c in cols if c.startswith('VR')]
+    if not vib_cols:
+        raise RuntimeError(f"Не найдено вибрационных колонок (VR*). Есть: {cols}")
+    df['RMS_VIB'] = np.sqrt((df[vib_cols]**2).mean(axis=1))
+
+    # 2) Давление
+    if 'Pressure' not in df.columns:
+        raise RuntimeError(f"Не найдена колонка 'Pressure'. Есть: {cols}")
+    # Именование параметра для дальнейшего выбора
+    df.rename(columns={'Pressure': 'PRESS'}, inplace=True)
+
+    # Сравнение линейной аппроксимации для двух кандидатов
+    candidates = ['RMS_VIB', 'PRESS']
+    best_R2, best_param = -1.0, None
+    x = df['time'].values
+    for param in candidates:
+        y = df[param].values
+        if y.std() == 0:
+            continue
+        # y = m*x + c
+        m, c = np.polyfit(x, y, 1)
+        y_pred = m*x + c
+        ss_res = ((y - y_pred)**2).sum()
+        ss_tot = ((y - y.mean())**2).sum()
+        R2 = 1 - ss_res/ss_tot if ss_tot > 0 else 0
+        if R2 > best_R2:
+            best_R2, best_param = R2, param
+
+    if best_param is None:
+        raise RuntimeError("Ни один параметр не показал ненулевой дисперсии")
+
+    # Подготовка итогового DataFrame и его сохранение
+    deg_df = df[['time', best_param]].copy()
+    out_dir = os.path.join('datasets', 'processed', 'degradation')
+    os.makedirs(out_dir, exist_ok=True)
+    deg_df.to_csv(os.path.join(out_dir, 'deg_data.csv'), index=False)
+
+    return deg_df
