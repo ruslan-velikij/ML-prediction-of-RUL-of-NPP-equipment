@@ -59,39 +59,75 @@
 
 ## Структура проекта
 ML-prediction-of-RUL-of-NPP-equipment/
+
 ├── README.md                   # Описание проекта и инструкция по запуску
+
 ├── requirements.txt            # Перечень Python-библиотек
+
 ├── venv                        # Виртуальное окружение Python
+
 │
+
 ├── datasets/
+
 │   ├── raw/                    # «сырые» данные, как они загружены из источников
+
 │   │   ├── transformers_gas/   # датасет 1: Power Transformers FDD & RUL
+
 │   │   ├── pump_sensor/        # датасет 2: Pump Sensor Data
+
 │   │   ├── pump_pm/            # датасет 3: Pump Predictive Maintenance
+
 │   │   ├── pwr_anomaly/        # датасет 4: PWR Anomaly Detection
+
 │   │   ├── generic_pm/         # датасет 5: Predictive Maintenance Dataset (generic)
+
 │   │   └── cmaps/              # датасет 6: NASA C-MAPSS
+
 │   │
+
 │   └── processed/              # преобразованные данные для моделей
+
 │       ├── statistical/        # подготовка для модели 1 (статистика отказов)
+
 │       ├── degradation/        # подготовка для модели 2 (экстраполяция параметра)
+
 │       ├── regression/         # признаки и таргеты для модели 3 (ML-регрессия)
+
 │       └── similarity/         # обрезанные траектории и матрицы расстояний для модели 4
+
 │
+
 ├── src/                        # Небольшие вспомогательные скрипты
+
 │   ├── data_prep.py            # Функции для чтения raw → processed
+
 │   ├── models.py               # Классы/функции: statistical, degradation, regression, similarity
+
 │   ├── utils.py                # Общие метрики и графики (RMSE, plot true vs pred и т.п.)
+
 │   └── run_pipeline.py         # Основной скрипт
+
 │
+
 ├── models/                     # Сохранённые обученные модели (.pkl)
+
 │   ├── model_stat.pkl
+
 │   ├── model_deg.pkl
+
 │   ├── model_reg.pkl
+
 │   └── model_sim.pkl
+
 │
+
 └── results/                    # Итоговые графики и таблицы с метриками
+
     ├── stat_performance.png
+
     ├── deg_performance.png
+
     ├── reg_performance.png
+
     └── sim_performance.png
