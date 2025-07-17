@@ -112,22 +112,5 @@ ML-prediction-of-RUL-of-NPP-equipment/
 
 ├── models/                     # Сохранённые обученные модели (.pkl)
 
-│   ├── model_stat.pkl
-
-│   ├── model_deg.pkl
-
-│   ├── model_reg.pkl
-
-│   └── model_sim.pkl
-
-│
-
 └── results/                    # Итоговые графики и таблицы с метриками
 
-    ├── stat_performance.png
-
-    ├── deg_performance.png
-
-    ├── reg_performance.png
-
-    └── sim_performance.png
