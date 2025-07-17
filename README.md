@@ -19,7 +19,7 @@
 
 
 ## Подготовка датасетов
-- Скачать датасеты по ссылке: https://disk.yandex.ru/d/gC3CcPDnitIo2w
+- Скачать датасеты по ссылке: https://disk.yandex.ru/d/1gDLa0CU9NJxIQ
 - Распаковать в корень проекта
 
 
