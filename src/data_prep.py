@@ -4,11 +4,13 @@ import pandas as pd
 
 def prep_stat():
     """
-    Читает сырые данные из datasets/raw/generic_pm/,
-    вычисляет время до отказа для каждого устройства
-    и сохраняет результат в datasets/processed/statistical/.
-    Возвращает DataFrame stat_df с колонками:
-    device, duration (в днях), event (флаг отказа).
+    Читает сырые данные из datasets/raw/generic_pm/, для каждого device:
+    – считает duration (в днях) до отказа/цензурирования,
+    – флаг event (1=отказ, 0=не отказ),
+    – извлекает baseline-признаки metric1–metric9 (из первой записи).
+    Возвращает DataFrame с колонками:
+    ['device','duration','event','metric1',...,'metric9']
+    и сохраняет его в datasets/processed/statistical/stat_data.csv.
     """
     raw_folder = os.path.join('datasets', 'raw', 'generic_pm')
     csv_files = [f for f in os.listdir(raw_folder) if f.endswith('.csv')]
@@ -17,39 +19,36 @@ def prep_stat():
             "No CSV files found in datasets/raw/generic_pm/"
             )
 
-    df_list = []
-    for csv_file in csv_files:
-        file_path = os.path.join(raw_folder, csv_file)
-        df = pd.read_csv(file_path)
-        df_list.append(df)
-    data = pd.concat(df_list, ignore_index=True)
-
-    data['date'] = pd.to_datetime(data['date'], format='%m/%d/%Y')
+    df = pd.concat(
+        [pd.read_csv(os.path.join(raw_folder, f)) for f in csv_files],
+        ignore_index=True
+    )
+    df['date'] = pd.to_datetime(df['date'], format='%m/%d/%Y')
 
     records = []
-    for device, group in data.groupby('device'):
-        group = group.sort_values('date')
-        start_date = group['date'].iloc[0]
-        event_occurred = int((group['failure'] == 1).any())
+    metrics_cols = [f'metric{i}' for i in range(1, 10)]
 
-        if event_occurred:
-            fail_date = group[group['failure'] == 1]['date'].iloc[0]
-        else:
-            fail_date = group['date'].iloc[-1]
+    for device, g in df.groupby('device'):
+        g = g.sort_values('date')
+        start = g['date'].iloc[0]
 
-        raw_days = (fail_date - start_date).days
-        duration_days = raw_days if raw_days > 0 else 1
+        event = int((g['failure'] == 1).any())
+        fail_date = g.loc[g['failure'] == 1,
+                          'date'].iloc[0] if event else g['date'].iloc[-1]
 
-        records.append({
-            'device': device,
-            'duration': duration_days,
-            'event': event_occurred
-        })
+        raw_days = (fail_date - start).days
+        duration = raw_days if raw_days > 0 else 1
+
+        baseline = g.iloc[0][metrics_cols].to_dict()
+
+        rec = {'device': device, 'duration': duration, 'event': event}
+        rec.update(baseline)
+        records.append(rec)
 
     stat_df = pd.DataFrame(records)
-
     processed_folder = os.path.join('datasets', 'processed', 'statistical')
     os.makedirs(processed_folder, exist_ok=True)
-    stat_df.to_csv(os.path.join(processed_folder, 'stat_data.csv'),
-                   index=False)
+    stat_df.to_csv(os.path.join(
+        processed_folder, 'stat_data.csv'), index=False
+        )
     return stat_df

@@ -1,45 +1,42 @@
-import joblib
-import numpy as np
 import os
+import joblib
 import matplotlib.pyplot as plt
-# Импортируем WeibullFitter из lifelines для построения Weibull-модели
-from lifelines import WeibullFitter
+from lifelines import WeibullAFTFitter
+from sklearn.preprocessing import StandardScaler
 
 
 def fit_weibull(stat_df):
     """
-    Подгоняет Weibull AFT-модель на основе данных stat_df (время до отказа).
-    Возвращает обученный объект модели, сохраняет его в models/model_stat.pkl.
-    Также строит график функции выживания с отметкой текущего возраста
-    и сохраняет в results/stat_performance.png.
+    Обучает Weibull AFT-модель с ковариатами metric1–metric9.
+    Сохраняет модель и survival-plot.
     """
-    durations = stat_df['duration']
-    events = stat_df['event']
+    duration_col = 'duration'
+    event_col = 'event'
+    covariates = [c for c in stat_df.columns if c.startswith('metric')]
 
-    wbf = WeibullFitter()
-    wbf.fit(durations, events)
+    df_fit = stat_df[covariates + [duration_col, event_col]].copy()
 
-    joblib.dump(wbf, os.path.join('models', 'model_stat.pkl'))
+    scaler = StandardScaler()
+    df_fit[covariates] = scaler.fit_transform(df_fit[covariates])
+
+    aft = WeibullAFTFitter(penalizer=0.01)
+    aft.fit(df_fit, duration_col=duration_col, event_col=event_col)
+
+    os.makedirs('models', exist_ok=True)
+    joblib.dump(aft, os.path.join('models', 'model_stat.pkl'))
+
+    avg_cov = df_fit[covariates].median().to_frame().T
+    sf = aft.predict_survival_function(avg_cov)
 
     plt.figure(figsize=(6, 4))
-    ax = wbf.plot_survival_function(ci_show=False)
+    plt.plot(sf.index, sf.iloc[:, 0], label='Средний профиль')
+    plt.xlabel('Время работы (дни)')
+    plt.ylabel('Вероятность безотказной работы S(t)')
+    plt.title('Weibull AFT с ковариатами — survival function')
+    plt.legend()
 
-    current_age = wbf.median_survival_time_
-    survival_at_current = float(
-        np.exp(-((current_age / wbf.lambda_) ** wbf.rho_))
-        )
-    ax.axvline(current_age, color='red', linestyle='--',
-               label=f'Текущий возраст ≈ {current_age:.0f} дней')
-    ax.axhline(survival_at_current, color='red', linestyle='--')
-    ax.scatter(current_age, survival_at_current, color='red')
-
-    plt.xlabel('Время работы оборудования (дни)')
-    plt.ylabel('Вероятность безотказной работы (S(t))')
-    plt.title('Weibull модель — функция выживания')
-    plt.legend(loc='best')
-
-    results_path = os.path.join('results', 'stat_performance.png')
-    plt.savefig(results_path)
+    os.makedirs('results', exist_ok=True)
+    plt.savefig(os.path.join('results', 'stat_performance.png'))
     plt.close()
 
-    return wbf
+    return aft
