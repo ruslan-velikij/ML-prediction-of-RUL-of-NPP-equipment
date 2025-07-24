@@ -23,7 +23,6 @@ datasets/
 
 # Сохранённые модели
 models/*.pkl
-models/*.joblib
 
 # Результаты и визуализации
 results/*.png

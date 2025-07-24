@@ -6,34 +6,35 @@ from models import fit_weibull, fit_degradation
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 
-def main():
-    # Блок запуска модели 1
+def main() -> None:
+    """Entry point for the pipeline."""
+
+    # ================= Модель 1: Weibull AFT regressor =================
     print("Подготавливаем данные для статистического анализа отказов...")
     stat_df = prep_stat()
 
-    print("Обучаем Weibull-модель и строим survival-кривую...")
+    print("Обучаем Weibull‑модель и строим survival‑кривую…")
     fit_weibull(stat_df)
 
     print(
-          "Готово! Модель сохранена в models/model_stat.pkl, "
-          "график — в results/stat_performance.png"
-        )
+        "Готово! Weibull‑модель сохранена в models/model_stat_D1.pkl, "
+        "график — в results/stat_performance_D1.png",
+    )
 
-    # Блок запуска модели 2
-    print("Подготавливаем данные для экстраполяции деградационного параметра...")
+    # ========== Модель 2: Линейная/Экспоненциальная регрессия ==========
+    print("\nПодготавливаем данные для модели экстраполяции деградации…")
     deg_df = prep_deg()
-    print("Строим тренд и вычисляем RUL...")
-    result = fit_degradation(deg_df)
 
-    RUL_days = result['RUL_days']
-    if RUL_days >= 1:
-        RUL_str = f"{RUL_days:.1f} дней"
-    else:
-        RUL_hours = RUL_days * 24
-        RUL_str = f"{RUL_hours:.1f} часов"
+    print("Строим линейную и экспоненциальную регрессии и вычисляем RUL…")
+    model_info = fit_degradation(deg_df)
+
     print(
-          "Готово! Модель сохранена в models/model_deg.pkl, "
-          f"график — в results/deg_performance.png, прогноз RUL = {RUL_str}"
+        f"Готово! Выбрана {model_info['model']}‑модель (R² = {model_info['R2']}), "
+        f"прогноз RUL = {model_info['RUL_days']} единиц времени",
+    )
+    print(
+        "Файл модели — models/model_deg_D2.pkl, "
+        "график — results/deg_performance_D2.png",
     )
 
 
