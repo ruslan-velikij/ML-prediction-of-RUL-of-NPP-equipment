@@ -1,9 +1,13 @@
 import os
 import joblib
+import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 from lifelines import WeibullAFTFitter
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestRegressor
 
 
 def fit_weibull(stat_df):
@@ -122,3 +126,57 @@ def fit_degradation(deg_df):
     plt.legend()
     plt.savefig('results/deg_performance_D2.png');  plt.close()
     return model_info
+
+
+def train_rf_regressor(reg_df):
+    # 1. Разделение на X и y
+    X = reg_df.drop(columns=['rul'])
+    y = reg_df['rul']
+
+    # 2. Разделение на 80/20
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, shuffle=True
+    )
+
+    # 3. Обучение Random Forest (100 деревьев)
+    model = RandomForestRegressor(n_estimators=100, random_state=42)
+    model.fit(X_train, y_train)
+
+    # 4. Оценка качества
+    y_pred = model.predict(X_test)
+    mse  = mean_squared_error(y_test, y_pred)         # классический MSE
+    rmse = np.sqrt(mse)
+    mae  = mean_absolute_error (y_test, y_pred)
+    print(f'Validation RMSE: {rmse:.3f}')
+    print(f'Validation MAE : {mae:.3f}')
+
+    # 5. Сохранение модели
+    os.makedirs('models', exist_ok=True)
+    with open('models/model_reg_D3.pkl', 'wb') as f:
+        pickle.dump(model, f)
+
+    # 6. Визуализация True vs Pred
+    plt.figure(figsize=(6,6))
+    plt.scatter(y_test, y_pred, alpha=0.5)
+    plt.plot([y.min(), y.max()], [y.min(), y.max()], 'k--')
+    plt.xlabel('True RUL')
+    plt.ylabel('Predicted RUL')
+    plt.title('True vs Predicted RUL')
+    plt.tight_layout()
+
+    # 7. Визуализация важности признаков (топ-10)
+    importances = model.feature_importances_
+    feat_names = X.columns
+    indices = importances.argsort()[-10:][::-1]
+    plt.figure(figsize=(8,4))
+    plt.barh(range(10), importances[indices][::-1], align='center')
+    plt.yticks(range(10), feat_names[indices][::-1])
+    plt.xlabel('Feature Importance')
+    plt.title('Top 10 Features')
+
+    # 8. Сохранение графиков в один файл
+    os.makedirs('results', exist_ok=True)
+    plt.savefig('results/reg_performance_D3.png')
+    plt.close()
+
+    return model, rmse, mae

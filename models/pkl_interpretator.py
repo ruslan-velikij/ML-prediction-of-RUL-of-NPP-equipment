@@ -4,6 +4,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 
 def main():
@@ -107,6 +109,73 @@ def main():
         print("→ results/deg_performance_interpretation_D2.png")
     else:
         print(f"Не найден файл с данными для деградации: {deg_data_csv}")
+
+# 3.1) Интерпретация регрессионной модели RUL. Прокладка путей
+    print("\n\n\n=== Regression Model Interpretation ===")
+    reg_csv       = os.path.join('datasets', 'processed', 'regression', 'pump_reg.csv')
+    reg_model_pkl = os.path.join('models', 'model_reg_D3.pkl')
+
+    #3.2 Загрузка датасета
+    df_reg = pd.read_csv(reg_csv, index_col=0)
+    X = df_reg.drop(columns=['rul'])
+    y = df_reg['rul']
+
+    #3.3 Воспроизводимое разбиение на train/test
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
+
+    #3.4 Загрузка обученной модели
+    model_reg = joblib.load(reg_model_pkl)
+
+    #3.5 Предсказание и метрики
+    y_train_pred = model_reg.predict(X_train)
+    mse_train   = mean_squared_error(y_train, y_train_pred)
+    rmse_train  = np.sqrt(mse_train)
+    mae_train   = mean_absolute_error(y_train, y_train_pred)
+    print(f"[TRAIN] RMSE: {rmse_train:.3f}, MAE: {mae_train:.3f}")
+
+    y_test_pred = model_reg.predict(X_test)
+    mse_test   = mean_squared_error(y_test, y_test_pred)
+    rmse_test  = np.sqrt(mse_test)
+    mae_test   = mean_absolute_error(y_test, y_test_pred)
+    print(f"[TEST]  RMSE: {rmse_test:.3f}, MAE: {mae_test:.3f}")
+
+    #3.6 Визуализация важности признаков (топ-10)
+    importances = model_reg.feature_importances_
+    feat_names  = X.columns
+    top_idx     = importances.argsort()[::-1][:10]
+
+    plt.figure(figsize=(8,4))
+    plt.barh(
+        np.arange(10),
+        importances[top_idx][::-1],
+        align='center'
+    )
+    plt.yticks(
+        np.arange(10),
+        feat_names[top_idx][::-1]
+    )
+    plt.xlabel("Feature Importance")
+    plt.title("Top 10 Features for RUL Regression")
+    plt.tight_layout()
+    os.makedirs('results', exist_ok=True)
+    plt.savefig('results/reg_feature_importance_D3.png')
+    plt.close()
+    print("→ results/reg_feature_importance_D3.png")
+
+    # график True vs Predicted
+    plt.figure(figsize=(6,6))
+    plt.scatter(y_test, y_test_pred, alpha=0.5)
+    diag = [y_test.min(), y_test.max()]
+    plt.plot(diag, diag, 'k--')
+    plt.xlabel("True RUL")
+    plt.ylabel("Predicted RUL")
+    plt.title("True vs Predicted RUL (Test)")
+    plt.tight_layout()
+    plt.savefig('results/reg_true_vs_pred_D3.png')
+    plt.close()
+    print("→ results/reg_true_vs_pred_D3.png")
 
 
 if __name__ == '__main__':

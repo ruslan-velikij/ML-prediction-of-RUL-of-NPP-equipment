@@ -19,12 +19,13 @@
 
 
 ## Подготовка датасетов
-- Скачать датасеты по ссылке: https://disk.yandex.ru/d/1gDLa0CU9NJxIQ
+- Скачать датасеты по ссылке: https://disk.yandex.ru/d/Rg6gY2RhuXaYRQ
 - Распаковать в корень проекта
 
 
 ## Запуск моделей
 - перейти в корень проекта
+- активировать виртуальное окружение
 - прописать команду: python src/run_pipeline.py
 - запуск скрипта интерпретации: python pkl_interpretator.py
 
@@ -96,8 +97,6 @@ ML-prediction-of-RUL-of-NPP-equipment/
 │   ├── data_prep.py            # Функции для чтения raw → processed
 
 │   ├── models.py               # Классы/функции: statistical, degradation, regression, similarity
-
-│   ├── utils.py                # Общие метрики и графики (RMSE, plot true vs pred и т.п.)
 
 │   └── run_pipeline.py         # Основной скрипт
 

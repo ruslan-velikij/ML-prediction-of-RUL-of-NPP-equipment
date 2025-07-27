@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import numpy as np
+from sklearn.impute import SimpleImputer
 
 
 def prep_stat():
@@ -85,3 +86,91 @@ def prep_deg():
     deg_df = df[['time', best_param]].copy()
     deg_df.to_csv('datasets/processed/degradation/deg_data_D2.csv', index=False)
     return deg_df
+
+
+def _trend_coef(x):
+    try:
+        return np.polyfit(np.arange(len(x)), x, 1)[0]
+    except np.linalg.LinAlgError:
+        return 0.0
+
+
+def prep_reg():
+    # 1. Чтение исходного CSV и удаление служебного индекса
+    df = pd.read_csv('datasets/raw/pump_pm/rul_hrs.csv')
+    if 'Unnamed: 0' in df.columns:
+        df.drop(columns=['Unnamed: 0'], inplace=True)
+
+    # 2. Обработка временной метки
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    df.sort_values('timestamp', inplace=True)
+    df.set_index('timestamp', inplace=True)
+
+    # 3. Заполнение пропусков медианой по каждому датчику
+    sensor_cols = [c for c in df.columns if c.startswith('sensor_')]
+    imputer = SimpleImputer(strategy='median')
+    df[sensor_cols] = imputer.fit_transform(df[sensor_cols])
+
+    # 4. Почасовая агрегация данных (усреднение сенсоров, последний RUL)
+    agg_dict = {col: 'mean' for col in sensor_cols}
+    agg_dict['rul'] = 'last'
+    df_hourly = df.resample('h').agg(agg_dict)
+
+    # 5. Извлечение дополнительных временных признаков
+    df_hourly['month'] = df_hourly.index.month
+    df_hourly['day']   = df_hourly.index.day
+    df_hourly['hour']  = df_hourly.index.hour
+    df_hourly['hour_sin'] = np.sin(2 * np.pi * df_hourly['hour'] / 24)
+    df_hourly['hour_cos'] = np.cos(2 * np.pi * df_hourly['hour'] / 24)
+
+    # 6. Скользящие агрегаты и тренд для каждого окна — соберём их в список
+    feature_dfs = []  # сюда будем класть все новые блоки признаков
+    window_sizes = [3, 6, 12, 24]
+
+    for w in window_sizes:
+        rolled = df_hourly[sensor_cols].rolling(window=w, min_periods=1)
+        # базовые статистики
+        feature_dfs.append(rolled.mean().add_suffix(f'_win{w}_mean'))
+        feature_dfs.append(rolled.std().add_suffix( f'_win{w}_std'))
+        feature_dfs.append(rolled.min().add_suffix( f'_win{w}_min'))
+        feature_dfs.append(rolled.max().add_suffix( f'_win{w}_max'))
+        feature_dfs.append(rolled.quantile(0.25).add_suffix(f'_win{w}_q25'))
+        feature_dfs.append(rolled.quantile(0.75).add_suffix(f'_win{w}_q75'))
+        # размах
+        range_df = rolled.max().subtract(rolled.min()).add_suffix(f'_win{w}_range')
+        feature_dfs.append(range_df)
+
+        # тренд с проверкой на SVD
+        def _trend(x):
+            try:
+                return np.polyfit(np.arange(len(x)), x, 1)[0]
+            except np.linalg.LinAlgError:
+                return 0.0
+        
+    trend_df = (
+        df_hourly[sensor_cols]
+          .rolling(window=w, min_periods=w)
+          .apply(_trend_coef, raw=True)
+          .add_suffix(f'_win{w}_trend')
+    )
+    feature_dfs.append(trend_df)
+
+    # После цикла объединяем все вместе
+    df_hourly = pd.concat([df_hourly] + feature_dfs, axis=1)
+
+    # 7. Лаговые признаки (1h, 3h, 6h)
+    lag_dfs = []
+    for lag in [1, 3, 6]:
+        df_shifted = df_hourly[sensor_cols].shift(lag)
+        df_shifted.columns = [f'{c}_lag{lag}' for c in sensor_cols]
+        lag_dfs.append(df_shifted)
+    df_hourly = pd.concat([df_hourly] + lag_dfs, axis=1)
+
+    # 8. Удаление строк с NaN (оставшиеся после окон и лагов)
+    df_final = df_hourly.dropna()
+
+    # 9. Сохранение подготовленного датасета
+    os.makedirs('datasets/processed/regression', exist_ok=True)
+    df_final.to_csv('datasets/processed/regression/pump_reg.csv', index=True)
+
+    return df_final
