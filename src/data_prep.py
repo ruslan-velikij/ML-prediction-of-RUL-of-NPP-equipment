@@ -118,8 +118,8 @@ def prep_reg():
 
     # 5. Извлечение дополнительных временных признаков
     df_hourly['month'] = df_hourly.index.month
-    df_hourly['day']   = df_hourly.index.day
-    df_hourly['hour']  = df_hourly.index.hour
+    df_hourly['day'] = df_hourly.index.day
+    df_hourly['hour'] = df_hourly.index.hour
     df_hourly['hour_sin'] = np.sin(2 * np.pi * df_hourly['hour'] / 24)
     df_hourly['hour_cos'] = np.cos(2 * np.pi * df_hourly['hour'] / 24)
 
@@ -131,9 +131,9 @@ def prep_reg():
         rolled = df_hourly[sensor_cols].rolling(window=w, min_periods=1)
         # базовые статистики
         feature_dfs.append(rolled.mean().add_suffix(f'_win{w}_mean'))
-        feature_dfs.append(rolled.std().add_suffix( f'_win{w}_std'))
-        feature_dfs.append(rolled.min().add_suffix( f'_win{w}_min'))
-        feature_dfs.append(rolled.max().add_suffix( f'_win{w}_max'))
+        feature_dfs.append(rolled.std().add_suffix(f'_win{w}_std'))
+        feature_dfs.append(rolled.min().add_suffix(f'_win{w}_min'))
+        feature_dfs.append(rolled.max().add_suffix(f'_win{w}_max'))
         feature_dfs.append(rolled.quantile(0.25).add_suffix(f'_win{w}_q25'))
         feature_dfs.append(rolled.quantile(0.75).add_suffix(f'_win{w}_q75'))
         # размах
@@ -146,12 +146,12 @@ def prep_reg():
                 return np.polyfit(np.arange(len(x)), x, 1)[0]
             except np.linalg.LinAlgError:
                 return 0.0
-        
+
     trend_df = (
         df_hourly[sensor_cols]
-          .rolling(window=w, min_periods=w)
-          .apply(_trend_coef, raw=True)
-          .add_suffix(f'_win{w}_trend')
+        .rolling(window=w, min_periods=w)
+        .apply(_trend_coef, raw=True)
+        .add_suffix(f'_win{w}_trend')
     )
     feature_dfs.append(trend_df)
 

@@ -74,7 +74,8 @@ def fit_degradation(deg_df):
 
     # Выбор лучшей модели
     if R2_exp > R2_lin:
-        model_type = 'exponential';  R2_best = R2_exp
+        model_type = 'exponential'
+        R2_best = R2_exp
         coeff = {'A': A, 'B': B}
 
         if 'RMS' in param_col or 'vib' in param_col.lower():
@@ -86,7 +87,8 @@ def fit_degradation(deg_df):
 
         t_cross = np.log(threshold/A)/B if (B != 0 and threshold > 0) else float('inf')
     else:
-        model_type = 'linear';  R2_best = R2_lin
+        model_type = 'linear'
+        R2_best = R2_lin
         coeff = {'slope': m, 'intercept': c}
         if 'RMS' in param_col or 'vib' in param_col.lower():
             threshold = 4.5
@@ -110,7 +112,7 @@ def fit_degradation(deg_df):
     joblib.dump(model_info, 'models/model_deg_D2.pkl')
 
     # Построение и сохранение графика
-    plt.figure(figsize=(6,4))
+    plt.figure(figsize=(6, 4))
     plt.plot(x, y, 'o-', label='Данные')
     if model_type == 'linear':
         x_line = np.linspace(0, max(x.max(), RUL), 100)
@@ -121,10 +123,12 @@ def fit_degradation(deg_df):
     plt.axhline(y=threshold, color='red', linestyle='--', label='Порог')
     if RUL > 0:
         plt.axvline(x=RUL, color='magenta', linestyle=':', label='Прогноз RUL')
-    plt.xlabel('Время (дни)');  plt.ylabel(param_col)
-    plt.title('Экстраполяция деградационного параметра')
-    plt.legend()
-    plt.savefig('results/deg_performance_D2.png');  plt.close()
+        plt.xlabel('Время (дни)')
+        plt.ylabel(param_col)
+        plt.title('Экстраполяция деградационного параметра')
+        plt.legend()
+        plt.savefig('results/deg_performance_D2.png')
+        plt.close()
     return model_info
 
 
@@ -144,9 +148,9 @@ def train_rf_regressor(reg_df):
 
     # 4. Оценка качества
     y_pred = model.predict(X_test)
-    mse  = mean_squared_error(y_test, y_pred)         # классический MSE
+    mse = mean_squared_error(y_test, y_pred)         # классический MSE
     rmse = np.sqrt(mse)
-    mae  = mean_absolute_error (y_test, y_pred)
+    mae = mean_absolute_error(y_test, y_pred)
     print(f'Validation RMSE: {rmse:.3f}')
     print(f'Validation MAE : {mae:.3f}')
 
@@ -156,7 +160,7 @@ def train_rf_regressor(reg_df):
         pickle.dump(model, f)
 
     # 6. Визуализация True vs Pred
-    plt.figure(figsize=(6,6))
+    plt.figure(figsize=(6, 6))
     plt.scatter(y_test, y_pred, alpha=0.5)
     plt.plot([y.min(), y.max()], [y.min(), y.max()], 'k--')
     plt.xlabel('True RUL')
@@ -168,7 +172,7 @@ def train_rf_regressor(reg_df):
     importances = model.feature_importances_
     feat_names = X.columns
     indices = importances.argsort()[-10:][::-1]
-    plt.figure(figsize=(8,4))
+    plt.figure(figsize=(8, 4))
     plt.barh(range(10), importances[indices][::-1], align='center')
     plt.yticks(range(10), feat_names[indices][::-1])
     plt.xlabel('Feature Importance')
