@@ -3,6 +3,8 @@ import joblib
 import pickle
 import matplotlib.pyplot as plt
 import numpy as np
+from tslearn.metrics import cdist_dtw
+from tslearn.neighbors import KNeighborsTimeSeriesRegressor
 from lifelines import WeibullAFTFitter
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error
@@ -133,33 +135,33 @@ def fit_degradation(deg_df):
 
 
 def train_rf_regressor(reg_df):
-    # 1. Разделение на X и y
+    # Разделение на X и y
     X = reg_df.drop(columns=['rul'])
     y = reg_df['rul']
 
-    # 2. Разделение на 80/20
+    # Разделение на 80/20
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, shuffle=True
     )
 
-    # 3. Обучение Random Forest (100 деревьев)
+    # Обучение Random Forest (100 деревьев)
     model = RandomForestRegressor(n_estimators=100, random_state=42)
     model.fit(X_train, y_train)
 
-    # 4. Оценка качества
+    # Оценка качества
     y_pred = model.predict(X_test)
-    mse = mean_squared_error(y_test, y_pred) 
+    mse = mean_squared_error(y_test, y_pred)
     rmse = np.sqrt(mse)
     mae = mean_absolute_error(y_test, y_pred)
     print(f'Validation RMSE: {rmse:.3f}')
     print(f'Validation MAE : {mae:.3f}')
 
-    # 5. Сохранение модели
+    # Сохранение модели
     os.makedirs('models', exist_ok=True)
     with open('models/model_reg_D3.pkl', 'wb') as f:
         pickle.dump(model, f)
 
-    # 6. Визуализация True vs Pred и важности признаков
+    # Визуализация True vs Pred и важности признаков
     importances = model.feature_importances_
     feat_names = X.columns
     top_idx = importances.argsort()[-10:][::-1]
@@ -188,3 +190,118 @@ def train_rf_regressor(reg_df):
     plt.close(fig)
 
     return model, rmse, mae
+
+
+def predict_dtw_knn(sim_ds=None):
+    """
+    Прогнозирование остаточного ресурса (RUL) с использованием подхода на основе схожести траекторий (DTW + kNN).
+    sim_ds: Необязательный аргумент — если передан заранее загруженный набор траекторий,
+    он будет использован; иначе траектории загрузятся из файла.
+    """
+    W = 1440
+    step = 60
+    k_neighbors = 3
+
+    # Загрузка обработанных траекторий (исторические случаи отказа)
+    if sim_ds is None:
+        data = np.load("datasets/processed/similarity/traj.npz", allow_pickle=True)
+        traj_keys = sorted(data.files, key=lambda x: int(x.split('_')[1]))
+        trajectories = [data[key] for key in traj_keys]
+    else:
+        trajectories = sim_ds
+
+    # Выбираем одну траекторию как «текущую» (имитация онлайн-прогноза).
+    # Исключаем её из обучения и пробуем предсказать её RUL.
+    # Здесь берём последнюю траекторию как текущую.
+    current_traj = trajectories[-1]
+    historical_trajs = trajectories[:-1]
+
+    # Генерация обучающей выборки из исторических траекторий
+    train_samples = []
+    train_labels = []
+    for traj in historical_trajs:
+        L = traj.shape[0]
+        for cut in range(0, L, step):
+            if cut == 0:
+                RUL = 1
+            else:
+                RUL = cut
+            if RUL > W:
+                RUL = W
+            if RUL == W:
+                continue
+            end_idx = L - (RUL - 1)
+            sample = traj[: end_idx]
+            sample_mean = sample.mean(axis=0)
+            sample_std = sample.std(axis=0)
+            sample_std[sample_std == 0] = 1e-9
+            sample_norm = (sample - sample_mean) / sample_std
+            train_samples.append(sample_norm.astype(np.float32))
+            train_labels.append(RUL)
+    train_samples = np.array(train_samples, dtype=object)
+    train_labels = np.array(train_labels, dtype=np.float32)
+
+    # Вычисление DTW-матрици расстояний между обучающими примерами
+    print("Вычисление матрицы DTW-расстояний между обучающими траекториями...")
+    D_train = cdist_dtw(train_samples)
+
+    # Обучаем kNN-регрессор с предвычисленной матрицей расстояний
+    knn = KNeighborsTimeSeriesRegressor(n_neighbors=k_neighbors, metric="precomputed")
+    knn.fit(D_train, train_labels)
+    print(f"kNN-модель обучена на {len(train_samples)} samples.")
+
+    # Прогнозируем RUL для текущей траектории
+    cur_mean = current_traj.mean(axis=0)
+    cur_std = current_traj.std(axis=0)
+    cur_std[cur_std == 0] = 1e-9
+    current_norm = (current_traj - cur_mean) / cur_std
+
+    D_query = cdist_dtw(train_samples, [current_norm])
+    D_query = D_query.flatten().astype(np.float32)
+
+    y_pred = knn.predict(D_query.reshape(1, -1))
+    predicted_rul = float(y_pred[0])
+    print(f"Прогнозируемый RUL для текущей траектории: ~{predicted_rul:.1f} minutes")
+    nn_index = int(np.argmin(D_query))
+
+    # 6. Построение графика: текущая траектория vs. лучшая историческая
+    plt.figure(figsize=(8, 5))
+    sensor_idx =  list(range(current_traj.shape[1])).index(22) if current_traj.shape[1] > 22 else 0
+    plt.plot(current_traj[:, sensor_idx], label="Текущая траектория", color="blue")
+    hist_traj_index = None
+    cum_count = 0
+    for t_index, traj in enumerate(historical_trajs):
+        sample_count = (traj.shape[0] // step) + 1
+        if nn_index < cum_count + sample_count:
+            hist_traj_index = t_index
+            break
+        cum_count += sample_count
+    if hist_traj_index is None:
+        hist_traj_index = 0
+    best_traj_full = historical_trajs[hist_traj_index]
+    plt.plot(best_traj_full[:, sensor_idx], label="Похожая историческая траектория", color="orange", linestyle="--")
+    cur_len = current_traj.shape[0]
+    hist_len = best_traj_full.shape[0]
+    plt.axvline(x=cur_len - 1, color="blue", linestyle=":")
+    plt.text(cur_len, current_traj[-1, sensor_idx], f"  Прогнозируемый RUL ≈ {predicted_rul:.0f} min", color="blue",
+             va='bottom', fontweight='bold')
+    plt.axvline(x=hist_len - 1, color="orange", linestyle=":")
+    plt.text(hist_len, best_traj_full[-1, sensor_idx], "  Отказ (исторический)", color="orange", va='bottom')
+    plt.xlabel("Время (минуты деградации)")
+    plt.ylabel("Значение сенсора 22 (норм.)")
+    plt.title("Сравнение текущей и исторической траекторий")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("results/sim_performance_D4.png")
+    plt.close
+
+    # Сохраняем модель и данные (DTW-матрицу и т.д.) для повторного использования
+    model_data = {
+        "dtw_matrix": D_train.astype(np.float32),
+        "rul_train": train_labels.astype(np.float32),
+        "knn": knn
+    }
+    import pickle
+    with open("models/model_sim_D4.pkl", "wb") as f:
+        pickle.dump(model_data, f)
+    print("Модель и данные сохранены в models/model_sim_D4.pkl")

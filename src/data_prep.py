@@ -174,3 +174,48 @@ def prep_reg():
     df_final.to_csv('datasets/processed/regression/pump_reg.csv', index=True)
 
     return df_final
+
+
+def prep_sim():
+    """Подготовка данных для модели, основанной на поиске похожих траекторий: извлечение отрезков перед каждым отказом."""
+    W = 1440
+
+    # 4.1. Загрузка сырых данных с датчиков
+    raw_path = "datasets/raw/pump_sensor/sensor.csv"
+    df = pd.read_csv(raw_path, index_col=0, parse_dates=["timestamp"])
+
+    # 4.2. Удаление неинформативных или дублирующих сенсоров
+    drop_cols = ["sensor_15", "sensor_50", "sensor_23"]
+    df.drop(columns=drop_cols + ["machine_status", "timestamp"], inplace=True, errors='ignore')
+
+    # 4.3. Интерполяция и заполнение пропусков для каждого сенсора
+    df.interpolate(method='linear', axis=0, inplace=True)
+    df.ffill(inplace=True)
+    df.bfill(inplace=True)
+
+    # 4.4 Поиск индексов отказов (строки со статусом BROKEN в исходных данных)
+    status_col = pd.read_csv(raw_path, usecols=["machine_status"])["machine_status"]
+    fail_indices = np.where(status_col == "BROKEN")[0]
+
+    # 4.5. Вырезание последних W измерений перед каждым отказом
+    trajectories = []
+    for idx in fail_indices:
+        start_idx = idx - W
+        if start_idx < 0:
+            continue
+        traj_df = df.iloc[start_idx: idx]
+        # 4.6. Стандартизация внутри каждой траектории (z-преобразование по каждому сенсору)
+        traj_vals = traj_df.to_numpy(dtype=np.float32)
+
+        mean = np.nanmean(traj_vals, axis=0)
+        std = np.nanstd(traj_vals, axis=0)
+
+        std[std == 0] = 1e-9
+        traj_vals = (traj_vals - mean) / std
+        trajectories.append(traj_vals)
+
+    # 4.7. Сохранение траекторий в файл формата NPZ
+    save_path = "datasets/processed/similarity/traj.npz"
+    traj_dict = {f"traj_{i}": traj for i, traj in enumerate(trajectories)}
+    np.savez_compressed(save_path, **traj_dict)
+    print(f"Сохранение {len(trajectories)} траекторий в {save_path}")

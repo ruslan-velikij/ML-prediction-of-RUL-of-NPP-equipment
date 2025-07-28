@@ -1,0 +1,48 @@
+
+=== Weibull AFT model summary ===
+                       coef   exp(coef)  ...         p   -log2(p)
+param   covariate                        ...                     
+lambda_ metric1    0.042869    1.043801  ...  0.605946   0.722738
+        metric2   -0.177567    0.837305  ...  0.000672  10.540292
+        metric3    0.076379    1.079371  ...  0.746472   0.421840
+        metric4   -0.126788    0.880920  ...  0.097399   3.359954
+        metric5   -0.042005    0.958865  ...  0.484035   1.046816
+        metric6    0.004615    1.004625  ...  0.958073   0.061792
+        metric7   -0.073426    0.929205  ...  0.723853   0.466231
+        metric8   -0.073426    0.929205  ...  0.723853   0.466231
+        metric9   -0.083849    0.919570  ...  0.589669   0.762022
+        Intercept  6.895567  987.885286  ...  0.000000        inf
+rho_    Intercept  0.116005    1.123002  ...  0.137582   2.861639
+
+[11 rows x 11 columns]
+→ results/stat_feature_coefficients_D1.png
+→ results/stat_survival_profiles_D1.png
+
+
+
+=== Degradation Model Summary ===
+param: RMS_VIB
+model: linear
+coefficients: {'slope': np.float64(-5.209835800738825e-05), 'intercept': np.float64(5.738725994114219)}
+R2: 0.064
+threshold: 4.5
+RUL_days: 23776.68
+Порог: 4.5, прогноз RUL: 23776.68 единиц времени
+→ results/deg_performance_interpretation_D2.png
+
+
+
+=== Regression Model Interpretation ===
+[TRAIN] RMSE: 8.479, MAE: 2.425
+[TEST]  RMSE: 18.480, MAE: 6.908
+→ results/reg_feature_importance_D3.png
+→ results/reg_true_vs_pred_D3.png
+
+
+
+=== Similarity-based Model Interpretation ===
+Число обучающих примеров: 144
+Используемое количество соседей (k): 3
+RUL метки: min=1, max=1380, median=690
+→ results/sim_rul_distribution_D4.png
+→ results/sim_dtw_matrix_D4.png

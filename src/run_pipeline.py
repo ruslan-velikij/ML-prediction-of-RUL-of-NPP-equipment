@@ -1,7 +1,7 @@
 import sys
 import os
-from data_prep import prep_stat, prep_deg, prep_reg
-from models import fit_weibull, fit_degradation, train_rf_regressor
+from data_prep import prep_stat, prep_deg, prep_reg, prep_sim
+from models import fit_weibull, fit_degradation, train_rf_regressor, predict_dtw_knn
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -46,6 +46,20 @@ def main() -> None:
 
     print('Pipeline completed.')
     print(f'Final RMSE: {rmse:.3f}, MAE: {mae:.3f}')
+
+    # === Модель 4: Similarity-based DTW + kNN регрессор ===
+    print("\n\nПодготовка данных для similarity-модели...")
+    # Генерация обрезанных траекторий перед отказами
+    prep_sim()
+
+    print("Обучение DTW + kNN регрессора и прогноз RUL…")
+    # Выполнение предсказания и визуализация
+    predict_dtw_knn()
+
+    print(
+        "Готово! Модель similarity сохранена в models/model_sim_D4.pkl, "
+        "график — в results/sim_performance_D4.png",
+    )
 
 
 if __name__ == "__main__":

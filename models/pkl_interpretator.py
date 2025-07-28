@@ -6,30 +6,31 @@ from sklearn.preprocessing import StandardScaler
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error
+import pickle
 
 
 def main():
-# 1.1) Weibull AFT model. Прокладка путей
+# 1.1 Weibull AFT model. Прокладка путей
     print("\n=== Weibull AFT model summary ===")
     processed_csv = os.path.join('datasets', 'processed',
                                  'statistical', 'stat_data_D1.csv')
     model_pkl = os.path.join('models', 'model_stat_D1.pkl')
     os.makedirs('results', exist_ok=True)
 
-    # 1.2) Загрузка данных и моделей
+    # 1.2 Загрузка данных и моделей
     df = pd.read_csv(processed_csv)
     aft = joblib.load(model_pkl)
 
-    # 1.3) Определение ковариатов для статистической модели
+    # 1.3 Определение ковариатов для статистической модели
     covs = [c for c in df.columns if c.startswith('metric')]
 
     scaler = StandardScaler()
     df[covs] = scaler.fit_transform(df[covs])
 
-    # 1.4) Вывод summary Weibull AFT
+    # 1.4 Вывод summary Weibull AFT
     print(aft.summary)
 
-    # 1.5) Бар-чарт коэффициентов (lambda_, metric1–9)
+    # 1.5 Бар-чарт коэффициентов (lambda_, metric1–9)
     coef_lambda = aft.summary.xs('lambda_',
                                  level='param')['coef'].reindex(covs)
     plt.figure(figsize=(8, 4))
@@ -42,7 +43,7 @@ def main():
     plt.close()
     print("→ results/stat_feature_coefficients_D1.png")
 
-    # 1.6) Survival-кривые для трёх типовых профилей
+    # 1.6 Survival-кривые для трёх типовых профилей
     profiles = {
         '25-й перцентиль': df[covs].quantile(0.25),
         'медиана':         df[covs].median(),
@@ -62,12 +63,12 @@ def main():
     plt.close()
     print("→ results/stat_survival_profiles_D1.png")
 
-# 2.1) Интерпретация модели деградации. Прокладка путей
+# 2.1 Интерпретация модели деградации. Прокладка путей
     print("\n\n\n=== Degradation Model Summary ===")
     model_deg_pkl = os.path.join('models', 'model_deg_D2.pkl')
     deg = joblib.load(model_deg_pkl)
 
-    # 2.2) Вывод ключевых параметров модели деградации
+    # 2.2 Вывод ключевых параметров модели деградации
     for key, val in deg.items():
         print(f"{key}: {val}")
 
@@ -110,7 +111,7 @@ def main():
     else:
         print(f"Не найден файл с данными для деградации: {deg_data_csv}")
 
-# 3.1) Интерпретация регрессионной модели RUL. Прокладка путей
+# 3.1 Интерпретация регрессионной модели RUL. Прокладка путей
     print("\n\n\n=== Regression Model Interpretation ===")
     reg_csv = os.path.join('datasets', 'processed', 'regression', 'pump_reg.csv')
     reg_model_pkl = os.path.join('models', 'model_reg_D3.pkl')
@@ -164,7 +165,7 @@ def main():
     plt.close()
     print("→ results/reg_feature_importance_D3.png")
 
-    # график True vs Predicted
+    # 3.7 график True vs Predicted
     plt.figure(figsize=(6, 6))
     plt.scatter(y_test, y_test_pred, alpha=0.5)
     diag = [y_test.min(), y_test.max()]
@@ -176,6 +177,41 @@ def main():
     plt.savefig('results/reg_true_vs_pred_D3.png')
     plt.close()
     print("→ results/reg_true_vs_pred_D3.png")
+
+# 4.1 Интерпретация similarity-based модели (DTW + kNN). Прокладка путей
+    print("\n\n\n=== Similarity-based Model Interpretation ===")
+    model_sim_pkl = os.path.join('models', 'model_sim_D4.pkl')
+    with open(model_sim_pkl, 'rb') as f:
+        sim = pickle.load(f)
+    dtw_matrix = sim['dtw_matrix']
+    rul_train = sim['rul_train']
+    knn = sim['knn']
+
+    n_samples = dtw_matrix.shape[0]
+    print(f"Число обучающих примеров: {n_samples}")
+    print(f"Используемое количество соседей (k): {knn.n_neighbors}")
+    print(f"RUL метки: min={rul_train.min():.0f}, max={rul_train.max():.0f}, median={np.median(rul_train):.0f}")
+
+    # 4.2 Визуализация распределения RUL в обучающей выборке
+    plt.figure(figsize=(6, 4))
+    plt.hist(rul_train, bins=20)
+    plt.xlabel("RUL (минуты)")
+    plt.ylabel("Частота")
+    plt.title("Распределение меток RUL в обучающей выборке")
+    plt.tight_layout()
+    plt.savefig('results/sim_rul_distribution_D4.png')
+    plt.close()
+    print("→ results/sim_rul_distribution_D4.png")
+
+    # 4.3 Визуализация DTW-матрицы расстояний
+    plt.figure(figsize=(6, 6))
+    plt.imshow(dtw_matrix, aspect='auto', cmap='viridis')
+    plt.colorbar(label='DTW расстояние')
+    plt.title("DTW-матрица расстояний между обучающими примерами")
+    plt.tight_layout()
+    plt.savefig('results/sim_dtw_matrix_D4.png')
+    plt.close()
+    print("→ results/sim_dtw_matrix_D4.png")
 
 
 if __name__ == '__main__':
