@@ -148,7 +148,7 @@ def train_rf_regressor(reg_df):
 
     # 4. Оценка качества
     y_pred = model.predict(X_test)
-    mse = mean_squared_error(y_test, y_pred)         # классический MSE
+    mse = mean_squared_error(y_test, y_pred) 
     rmse = np.sqrt(mse)
     mae = mean_absolute_error(y_test, y_pred)
     print(f'Validation RMSE: {rmse:.3f}')
@@ -159,28 +159,32 @@ def train_rf_regressor(reg_df):
     with open('models/model_reg_D3.pkl', 'wb') as f:
         pickle.dump(model, f)
 
-    # 6. Визуализация True vs Pred
-    plt.figure(figsize=(6, 6))
-    plt.scatter(y_test, y_pred, alpha=0.5)
-    plt.plot([y.min(), y.max()], [y.min(), y.max()], 'k--')
-    plt.xlabel('True RUL')
-    plt.ylabel('Predicted RUL')
-    plt.title('True vs Predicted RUL')
-    plt.tight_layout()
-
-    # 7. Визуализация важности признаков (топ-10)
+    # 6. Визуализация True vs Pred и важности признаков
     importances = model.feature_importances_
     feat_names = X.columns
-    indices = importances.argsort()[-10:][::-1]
-    plt.figure(figsize=(8, 4))
-    plt.barh(range(10), importances[indices][::-1], align='center')
-    plt.yticks(range(10), feat_names[indices][::-1])
-    plt.xlabel('Feature Importance')
-    plt.title('Top 10 Features')
+    top_idx = importances.argsort()[-10:][::-1]
 
-    # 8. Сохранение графиков в один файл
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(12, 5))
+
+    ax_scatter = axes[0]
+    ax_scatter.scatter(y_test, y_pred, alpha=0.5)
+    ax_scatter.plot([y.min(), y.max()], [y.min(), y.max()], 'k--')
+    ax_scatter.set_xlabel('True RUL')
+    ax_scatter.set_ylabel('Predicted RUL')
+    ax_scatter.set_title('True vs Predicted RUL')
+
+    ax_bar = axes[1]
+    ax_bar.barh(range(10), importances[top_idx][::-1], align='center')
+
+    fig.subplots_adjust(left=0.25)
+    ax_bar.set_yticks(range(10))
+    ax_bar.set_yticklabels(feat_names[top_idx][::-1], fontsize=9)
+    ax_bar.set_xlabel('Feature Importance')
+    ax_bar.set_title('Top 10 Features for RUL Regression')
+
     os.makedirs('results', exist_ok=True)
-    plt.savefig('results/reg_performance_D3.png')
-    plt.close()
+    fig.tight_layout()
+    fig.savefig('results/reg_performance_D3.png', bbox_inches='tight')
+    plt.close(fig)
 
     return model, rmse, mae
